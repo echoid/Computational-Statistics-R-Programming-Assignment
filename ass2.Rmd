@@ -1,0 +1,565 @@
+---
+title: "MAST90083"
+author: "Youran Zhou"
+date: "2021/10/9"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(HRW)
+library(splines)
+library(pracma)
+library(SpatialExtremes)
+library(MASS)
+```
+
+
+```{r}
+data(WarsawApts)
+head(WarsawApts)
+WarsawApts <- WarsawApts[order(WarsawApts$construction.date),]
+
+n = dim(WarsawApts)[1]
+```
+
+# Question 1
+
+## (1)
+
+```{r}
+
+x = WarsawApts$construction.date
+
+y = WarsawApts$areaPerMzloty
+
+
+  
+a = seq(0,1,length=22)[2:21]
+
+#(k = quantile(x,a))
+(k = unique(quantile(x,a)))
+
+```
+## (2)
+
+```{r}
+Splus = function(x, knot){
+  
+  result_matrix = matrix(0, length(x), length(knot))
+  
+  for (i in 1:length(knot)){
+    
+    for (j in 1:length(x)){
+      
+      result = x[j] - knot[i]
+      
+      
+      if (result <= 0){
+          result = 0
+      }
+      
+      result_matrix[j,i] = result
+      
+    }
+
+  }
+  return(result_matrix)
+
+}
+
+```
+
+Z is a matrix contains 20 basis function.
+$$
+Z = \left[
+\begin{array}{c}
+(x-k_1)_{+}  \\
+(x-k_2)_{+}\\
+\vdots\\
+(x-k_{20})_{+}
+\end{array}
+\right]
+$$
+
+
+
+
+
+```{r}
+x_range = seq(min(x)-200,max(x)+200,length=1000)
+
+plot_Z = Splus(x_range,k)
+```
+
+
+```{r}
+plot(x_range,plot_Z[,1],typ = "l",ylim = c(-1,2),xlim = c(min(x),max(x)),main = "Z matrix",xlab = "construction date(year)", ylab ="linear spline basis" )
+
+for (i in 2:dim(plot_Z)[2]){
+    lines(x_range,plot_Z[,i])
+
+}
+
+```
+
+## (3)
+
+
+```{r}
+Z = Splus(x,k)
+ones = rep(1,n)
+
+C = cbind(ones,x,Z)
+
+D = diag(1, length(k)+2,length(k)+2)
+D[1,1] = 0
+D[2,2] = 0
+
+lambda = seq(0,50,length=100)
+
+```
+
+```{r}
+fit_spline = function(D,C,y,lambda){
+  fit_y= matrix(0, nrow = length(y), ncol = length(lambda))
+  fit_df = c()
+  fit_RSS = c()
+  fit_GCV = c()
+  for (i in 1:length(lambda)){
+    
+    inver = ginv(t(C) %*% C + lambda[i] * D)
+    
+    predict_y = C%*% inver %*% t(C) %*% y
+    
+    df = sum(diag(inver %*% t(C) %*% C))
+    
+    RSS = sum((predict_y - y)^2)
+    
+    GCV = RSS / (1- df/n)^2
+    
+    
+    fit_y[,i] = predict_y
+    fit_df = c(fit_df, df)
+    fit_RSS = c(fit_RSS, RSS)
+    fit_GCV = c(fit_GCV, GCV)
+    
+  }
+  
+  
+  return(list(fit_y = fit_y,fit_df = fit_df, fit_RSS = fit_RSS, fit_GCV = fit_GCV))
+  
+}
+ 
+```
+
+```{r}
+fitted = fit_spline(D,C,y,lambda)
+```
+
+## (4)
+
+```{r}
+fitted$fit_RSS
+```
+```{r}
+fitted$fit_df
+```
+
+```{r}
+fitted$fit_GCV
+```
+
+## (5)
+
+
+```{r}
+min = which(fitted$fit_GCV == min(fitted$fit_GCV))
+
+(min_lambda = lambda[min])
+
+(MSE = fitted$fit_RSS[min_lambda]/n)
+```
+```{r}
+plot(x,y,xlab = "x",ylab = "y",main = "Fitted Spline")
+
+
+lines(x,fitted$fit_y[,min],col = 2)
+
+```
+### 60 Basis
+
+```{r}
+
+a = seq(0,1,length=62)[2:61]
+
+(k_60 = unique(quantile(x,a)))
+
+#(k_60 = quantile(x,a))
+
+
+```
+
+```{r}
+plot_Z_60 = Splus(x_range,k_60)
+
+plot(x_range,plot_Z_60[,1],typ = "l",ylim = c(-1,2),xlim = c(min(x),max(x)),main = "Z matrix",xlab = "construction date(year)", ylab ="linear spline basis" )
+
+for (i in 2:dim(plot_Z_60)[2]){
+    lines(x_range,plot_Z_60[,i])
+
+}
+```
+
+```{r}
+Z_60 = Splus(x,k_60)
+
+
+C_60 = cbind(ones,x,Z_60)
+
+D_60 = diag(1, length(k_60)+2,length(k_60)+2)
+D_60[1,1] = 0
+D_60[2,2] = 0
+
+```
+
+
+```{r}
+fitted_60 = fit_spline(D_60,C_60,y,lambda)
+```
+
+```{r}
+min_lambda_60 =  which(fitted_60$fit_GCV == min(fitted_60$fit_GCV))
+
+(MSE_60 = fitted_60$fit_RSS[min_lambda_60]/n)
+```
+
+```{r}
+plot(x,y,xlab = "x",ylab = "y",main = "Fitted Spline (60 basis)")
+
+lines(x,fitted_60$fit_y[,min_lambda_60],col=2)
+
+```
+
+
+
+
+# Question 2
+
+```{r}
+k_list = c(3,6,9,12,15,18)
+
+k_list = c(3,7,11,15,19,23)
+```
+
+```{r}
+KNN = function(k,current_X, X){
+  
+  d = abs(current_X - X)
+  
+  index = sort(d, index.return=TRUE)$ix[1:k]
+  
+  return(mean(y[index]))
+}
+```
+
+```{r}
+KNN_prediction = matrix(0,length(x),length(k_list))
+KNN_MSE = c()
+colnames(KNN_prediction) = k_list
+
+for (i in 1:length(k_list)){
+  predict_y = c()
+  for (current_x in x){
+    
+    predict_y = c(predict_y, KNN(k_list[i],current_x,x))
+    
+  }
+  
+  KNN_prediction[,i] = predict_y
+  
+  KNN_MSE = c(KNN_MSE,sum((predict_y - y)^2)/n)
+  
+}
+
+
+```
+
+```{r}
+par(mfrow=c(3,2))
+
+plot(x,y,main = "Knn with K = 3")
+points(x,KNN_prediction[,1],col = 2)
+
+plot(x,y,main = "Knn with K = 7")
+points(x,KNN_prediction[,2],col = 2)
+
+plot(x,y,main = "Knn with K = 11")
+points(x,KNN_prediction[,3],col = 2)
+
+plot(x,y,main = "Knn with K = 15")
+points(x,KNN_prediction[,4],col = 2)
+
+plot(x,y,main = "Knn with K = 19")
+points(x,KNN_prediction[,5],col = 2)
+
+plot(x,y,main = "Knn with K = 23")
+points(x,KNN_prediction[,6],col = 2)
+
+```
+
+```{r}
+rbind(k_list,KNN_MSE)
+```
+Overall there is not a significant difference between using KNN and spline, but we can choose different value of K to get slightly difference results.
+
+## (3)
+
+```{r}
+accommodate_Kernels = function(x){
+  if (abs(x) < 1) {
+    
+    Epanechnikov = 3/4*(1-x^2)
+    Biweight     = 15/16*(1-x^2)^2
+    Triweight    = 35/32*(1-x^2)^3
+    Uniform      = 1/2
+    Tricube      = 70/81*(1-(abs(x))^3)^3
+    
+  }else{
+    
+    Epanechnikov = 0
+    Biweight     = 0
+    Triweight    = 0
+    Uniform      = 0
+    Tricube      = 0
+  }
+  
+    Gaussian = (2*pi)^(-1/2)*exp(-x^2/2)
+    
+    #return(list(Epanechnikov = Epanechnikov,Gaussian=Gaussian,Biweight = Biweight,
+                #Triweight= Triweight, Uniform= Uniform, Tricube = Tricube))
+    
+    return(c(Epanechnikov,Gaussian,Biweight,Triweight, Uniform, Tricube))
+}
+```
+
+
+## (4)
+
+```{r}
+h = 2
+K_h = function(x_i,x_j){
+  return((x_j - x_i)/h )
+}
+```
+
+```{r}
+
+Kernel_predict = matrix(0,length(x),6)
+
+colnames(Kernel_predict) <- c("Epanechnikov","Gaussian","Biweight","Triweight","Uniform","Tricube")
+
+for (i in 1:length(x)){
+  Kernel_weight = matrix(0,length(x),6)
+  numerator = 0
+   
+  for (j in 1:length(x)){
+    
+    value =  K_h(x[i],x[j])
+    weight = accommodate_Kernels(value)
+    numerator = numerator + (weight * y[j])
+    Kernel_weight[j,] = accommodate_Kernels(value)
+  }
+  predict_y = numerator / colSums(Kernel_weight)
+  
+  
+  Kernel_predict[i,] = predict_y
+  
+}
+
+```
+
+
+```{r}
+Kernel_predict
+```
+## (5)
+
+
+```{r}
+par(mfrow=c(3,2))
+
+plot(x,y,main = "Epanechnikov Kernel")
+points(x,Kernel_predict[,1],col = 2,)
+
+plot(x,y,main = "Gaussian Kernel")
+points(x,Kernel_predict[,2],col = 2)
+
+plot(x,y,main = "Biweight Kernel")
+points(x,Kernel_predict[,3],col = 2)
+
+plot(x,y,main = "Triweight Kernel")
+points(x,Kernel_predict[,4],col = 2)
+
+plot(x,y,main = "Uniform Kernel")
+points(x,Kernel_predict[,5],col = 2)
+
+plot(x,y,main = "Tricube Kernel")
+points(x,Kernel_predict[,6],col = 2)
+```
+
+
+```{r}
+(Kernel_MSE = colSums((Kernel_predict - y)^2)/n)
+```
+The triweight kernel has the minimun mse
+
+
+# Question 3
+
+
+```{r}
+library("plot.matrix")
+library("png")
+library("fields")
+I = readPNG("CM.png")
+I = I[,,1] # only first channel
+I = t(apply(I, 2, rev))
+par(mfrow = c(1,2))
+image(I,col = gray((0:255)/255))
+plot(density(I))
+```
+
+
+
+```{r}
+mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-5, max.iter=100) {
+  
+  w.curr = w.init
+  mu.curr = mu.init
+  sigma.curr = sigma.init
+  
+
+  log_liks = c()
+  
+
+  log_liks = c(log_liks, compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
+
+
+  delta.ll = 1
+
+
+  n.iter = 1
+  
+  
+  #while((delta.ll > epsilon) & (n.iter <= max.iter)){
+  while( (n.iter <= max.iter)){
+
+
+    EM.out = EM.iter(X, w.curr, mu.curr, sigma.curr)
+    
+
+    w.curr = EM.out$w.new
+    mu.curr = EM.out$mu.new
+    sigma.curr = EM.out$sigma.new
+    
+    # observed log-likehoods with new parameter estimate 
+    log_liks = c(log_liks, compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
+    
+
+    delta.ll = log_liks[length(log_liks)]  - log_liks[length(log_liks)-1]
+
+
+    n.iter = n.iter + 1
+    
+    print(round(c(mu.curr,w.curr,sigma.curr),4))
+  }
+  
+  return(list(w.curr=w.curr, mu.curr=mu.curr, sigma.curr = sigma.curr,log_liks=log_liks))
+}
+```
+
+```{r}
+EM.iter <- function(X, w.curr, mu.curr,sigma.curr) {
+  
+  # E-step: compute E_{Z|X,\theta_0}[I(Z_i = k)]
+  
+  # for each sample $X_i$, compute $P(X_i, Z_i=k)$ 
+  prob.x.z = compute.prob.x.z(X, w.curr, mu.curr,sigma.curr)$prob.x.z
+  
+  # compute P(Z_i=k | X_i)
+  P_ik = prob.x.z / rowSums(prob.x.z)
+  
+  # M-step
+  w.new = colSums(P_ik)/sum(P_ik)  # sum(P_ik) is equivalent to sample size 
+  mu.new = colSums(P_ik*X)/colSums(P_ik)
+  
+  sigma.new = update_sigma(P_ik,mu.curr,X)
+
+  #return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.curr)
+  return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.new)
+         )
+}
+```
+
+
+
+```{r}
+# Compute observed log-likehoods
+compute.log.lik <- function(X, w.curr, mu.curr,sigma.curr) {
+  
+  # for each sample $X_i$, compute $P(X_i, Z_i=k)$
+  prob.x.z = compute.prob.x.z(X, w.curr, mu.curr,sigma.curr)$prob.x.z
+  
+  # incomplete log-likehoods
+  ill = sum(log(rowSums(prob.x.z)))
+  
+  return(list(ill=ill))
+}
+
+
+# for each sample $X_i$, compute $P(X_i, Z_i=k)$
+compute.prob.x.z <- function(X, w.curr, mu.curr,sigma.curr) {
+  
+  # for each sample $X_i$, compute $P(X_i, Z_i=k)$. Store these values in the columns of L:
+  L = matrix(NA, nrow=length(X), ncol= length(w.curr))
+  for(k in seq_len(ncol(L))) {
+    #L[, k] = dnorm(X, mean=mu.curr[k], sd=0.1)*w.curr[k]
+    L[, k] = dnorm(X, mean=mu.curr[k], sd=sigma.curr[k])*w.curr[k]
+  }
+  
+  return(list(prob.x.z=L))
+}
+```
+
+
+```{r}
+update_sigma = function(p,mu,X){
+  
+  
+  mu_matrix = t(replicate(length(X),mu))
+  X_matrix = replicate(length(mu),X)
+  
+  
+  update_P = (p * (X_matrix - mu_matrix)^2)
+  
+  return(colSums(update_P)/colSums(p) )
+  
+}
+```
+
+
+
+```{r}
+EM1 <- mixture.EM(c(I), w.init=c(0.2,0.3, 0.5), mu.init=c(0, 0.5, 1),sigma.init=c(0.1, 0.1, 0.1), epsilon=1e-10, max.iter=100)
+```
+
+
+
+```{r}
+EM1
+```
