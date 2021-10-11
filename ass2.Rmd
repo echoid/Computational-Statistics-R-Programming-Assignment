@@ -433,59 +433,89 @@ par(mfrow = c(1,2))
 image(I,col = gray((0:255)/255))
 plot(density(I))
 ```
+```{r}
+lappend <- function (lst, ...){
+lst <- c(lst, list(...))
+  return(lst)
+}
+```
 
 
 
 ```{r}
-mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-5, max.iter=100) {
+mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6, max.iter=100) {
   
   w.curr = w.init
   mu.curr = mu.init
   sigma.curr = sigma.init
   
+  m_list = list(mu.curr)
+  c_list = list(sigma.curr)
+  e_list = list(0)
+    
+  log_liks = c(compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
 
-  log_liks = c()
-  
 
-  log_liks = c(log_liks, compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
-
-
-  delta.ll = 1
+  criteria = 1
 
 
   n.iter = 1
   
   
-  #while((delta.ll > epsilon) & (n.iter <= max.iter)){
-  while( (n.iter <= max.iter)){
+  while((criteria > epsilon) & (n.iter <= max.iter)){
+  #while( (n.iter <= max.iter)){
+   
 
+    
+    n.iter = n.iter + 1
 
     EM.out = EM.iter(X, w.curr, mu.curr, sigma.curr)
+    
     
 
     w.curr = EM.out$w.new
     mu.curr = EM.out$mu.new
     sigma.curr = EM.out$sigma.new
     
-    # observed log-likehoods with new parameter estimate 
-    log_liks = c(log_liks, compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
+    m_list = lappend(m_list,mu.curr)
+    c_list = lappend(c_list,sigma.curr)
+    
     
 
-    delta.ll = log_liks[length(log_liks)]  - log_liks[length(log_liks)-1]
+    
+    
+    
+    e = sum(m_list[n.iter][[1]] - m_list[n.iter-1][[1]]) + 
+        sum(c_list[n.iter][[1]] - c_list[n.iter-1][[1]]) 
+    
+    
+    
+    e_list = lappend(e_list,e)
+    
+    criteria = abs(e - e_list[n.iter-1][[1]])
+
+    
+    # observed log-likehoods with new parameter estimate 
+    #log_liks = c(log_liks, compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
+    
+
+    #delta.ll = log_liks[length(log_liks)]  - log_liks[length(log_liks)-1]
 
 
-    n.iter = n.iter + 1
+    
     
     print(round(c(mu.curr,w.curr,sigma.curr),4))
+    
   }
   
-  return(list(w.curr=w.curr, mu.curr=mu.curr, sigma.curr = sigma.curr,log_liks=log_liks))
+  return(list(w.curr=w.curr, mu.curr=mu.curr, sigma.curr = sigma.curr,criteria=e_list))
 }
 ```
 
 ```{r}
 EM.iter <- function(X, w.curr, mu.curr,sigma.curr) {
   
+
   # E-step: compute E_{Z|X,\theta_0}[I(Z_i = k)]
   
   # for each sample $X_i$, compute $P(X_i, Z_i=k)$ 
@@ -518,12 +548,14 @@ compute.log.lik <- function(X, w.curr, mu.curr,sigma.curr) {
   # incomplete log-likehoods
   ill = sum(log(rowSums(prob.x.z)))
   
+  
   return(list(ill=ill))
 }
 
 
 # for each sample $X_i$, compute $P(X_i, Z_i=k)$
 compute.prob.x.z <- function(X, w.curr, mu.curr,sigma.curr) {
+
   
   # for each sample $X_i$, compute $P(X_i, Z_i=k)$. Store these values in the columns of L:
   L = matrix(NA, nrow=length(X), ncol= length(w.curr))
@@ -545,9 +577,9 @@ update_sigma = function(p,mu,X){
   X_matrix = replicate(length(mu),X)
   
   
-  update_P = (p * (X_matrix - mu_matrix)^2)
+  update_P = p * (X_matrix - mu_matrix)^2
   
-  return(colSums(update_P)/colSums(p) )
+  return(sqrt(colSums(update_P)/colSums(p) ))
   
 }
 ```
@@ -555,11 +587,11 @@ update_sigma = function(p,mu,X){
 
 
 ```{r}
-EM1 <- mixture.EM(c(I), w.init=c(0.2,0.3, 0.5), mu.init=c(0, 0.5, 1),sigma.init=c(0.1, 0.1, 0.1), epsilon=1e-10, max.iter=100)
+EM <- mixture.EM(c(I), w.init=c(0.3,0.3, 0.4), mu.init=c(0, 0.5, 1),sigma.init=c(0.1, 0.1, 0.1), epsilon=1e-6, max.iter=100)
 ```
 
 
 
 ```{r}
-EM1
+EM
 ```
