@@ -16,7 +16,9 @@ library(splines)
 library(pracma)
 library(SpatialExtremes)
 library(MASS)
-library(Rfast)
+library("plot.matrix")
+library("png")
+library("fields")
 ```
 
 
@@ -39,11 +41,12 @@ x = WarsawApts$construction.date
 y = WarsawApts$areaPerMzloty
 
 
+x_unique = unique(x)
   
 a = seq(0,1,length=22)[2:21]
 
 #(k = quantile(x,a))
-(k = unique(quantile(x,a)))
+(k = quantile(x_unique,a))
 
 ```
 ## (2)
@@ -133,7 +136,7 @@ fit_spline = function(D,C,y,lambda){
   fit_GCV = c()
   for (i in 1:length(lambda)){
     
-    inver = ginv(t(C) %*% C + lambda[i] * D)
+    inver = solve(t(C) %*% C + lambda[i] * D)
     
     predict_y = C%*% inver %*% t(C) %*% y
     
@@ -183,7 +186,7 @@ min = which(fitted$fit_GCV == min(fitted$fit_GCV))
 
 (min_lambda = lambda[min])
 
-(MSE = fitted$fit_RSS[min_lambda]/n)
+(MSE = fitted$fit_RSS[min]/n)
 ```
 ```{r}
 plot(x,y,xlab = "x",ylab = "y",main = "Fitted Spline")
@@ -198,7 +201,7 @@ lines(x,fitted$fit_y[,min],col = 2)
 
 a = seq(0,1,length=62)[2:61]
 
-(k_60 = unique(quantile(x,a)))
+(k_60 = quantile(x_unique,a))
 
 #(k_60 = quantile(x,a))
 
@@ -234,9 +237,13 @@ fitted_60 = fit_spline(D_60,C_60,y,lambda)
 ```
 
 ```{r}
-min_lambda_60 =  which(fitted_60$fit_GCV == min(fitted_60$fit_GCV))
 
-(MSE_60 = fitted_60$fit_RSS[min_lambda_60]/n)
+min_60 = which(fitted_60$fit_GCV == min(fitted_60$fit_GCV))
+
+(min_lambda_60 = lambda[min_60])
+
+(MSE_60 = fitted_60$fit_RSS[min_60]/n)
+
 ```
 
 ```{r}
@@ -247,6 +254,12 @@ lines(x,fitted_60$fit_y[,min_lambda_60],col=2)
 ```
 
 
+```{r}
+plot(x,y,xlab = "x",ylab = "y",main = "Fitted Spline (20 basis vs 60 basis)")
+
+lines(x,fitted_60$fit_y[,min_lambda_60],col=2)
+lines(x,fitted$fit_y[,min_lambda],col=3)
+```
 
 
 # Question 2
@@ -386,7 +399,7 @@ for (i in 1:length(x)){
 
 
 ```{r}
-Kernel_predict
+Kernel_predict[1:10,]
 ```
 ## (5)
 
@@ -395,7 +408,7 @@ Kernel_predict
 par(mfrow=c(3,2))
 
 plot(x,y,main = "Epanechnikov Kernel")
-points(x,Kernel_predict[,1],col = 2,)
+points(x,Kernel_predict[,1],col = 2)
 
 plot(x,y,main = "Gaussian Kernel")
 points(x,Kernel_predict[,2],col = 2)
@@ -417,16 +430,13 @@ points(x,Kernel_predict[,6],col = 2)
 ```{r}
 (Kernel_MSE = colSums((Kernel_predict - y)^2)/n)
 ```
-The triweight kernel has the minimun mse
 
 
 # Question 3
 
 
 ```{r}
-library("plot.matrix")
-library("png")
-library("fields")
+
 I = readPNG("CM.png")
 I = I[,,1] # only first channel
 I = t(apply(I, 2, rev))
@@ -495,15 +505,7 @@ mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6) {
     
     criteria = abs(e - e_list[n.iter-1][[1]])
 
-    
-    # observed log-likehoods with new parameter estimate 
-    #log_liks = c(log_liks, compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
-    
-
-    #delta.ll = log_liks[length(log_liks)]  - log_liks[length(log_liks)-1]
-
-
-    
+   
     
     print(round(c(mu.curr,sigma.curr,w.curr),4))
     
@@ -615,9 +617,10 @@ for (i in sort(c(I))){
 
 plot(density(I), main = "Density function")
 lines(sort(c(I)),EM_result,lty = 1,col = 2)
-legend(0,5.5,c("Image Density","Estimated"), lwd=c(2,2), col=c("black",2), y.intersp=1.5)
+legend(0,5.5,c("Density","EM"), lwd=c(2,2), col=c("black",2), y.intersp=1.5)
 
 ```
+
 ```{r}
 EM_result_Image = c()
 
@@ -637,24 +640,26 @@ EM_Image = matrix(EM_result_Image,nrow = 398,ncol = 398)
 z_predict = data.frame(compute.prob.x.z(c(I), EM$w.curr, EM$mu.curr,EM$sigma.curr))
 z_max = apply(z_predict,1,which.max)
 
-z_max[z_max == 1] = 0
-z_max[z_max == 2] = 8
-z_max[z_max == 3] = 4
+z_plot1 = z_max
 
-#z_max_ = new[match(z_max,c(1,2,3))]
+z_plot1[z_plot1 == 1] = 0
+z_plot1[z_plot1 == 2] = 8
+z_plot1[z_plot1 == 3] = 4
+
 
 ```
 
 ```{r}
-image.plot(matrix(z_max,nrow = 398,ncol = 398))
+image.plot(matrix(z_plot1,nrow = 398,ncol = 398))
 ```
 
 
 ```{r}
-image.plot(matrix(z_predict,nrow = 398,ncol = 398))
-```
+posterior = z_predict / rowSums(z_predict)
+mu = t(replicate(length(c(I)),EM$mu.curr))
 
-```{r}
-rowMaxs(z_predict)
-```
+image2 = rowSums(posterior * mu)
 
+image.plot(matrix(image2,nrow = 398,ncol = 398))
+
+```
