@@ -1,5 +1,5 @@
 ---
-title: "MAST90083"
+title: "MAST90083 Assignment2"
 author: "Youran Zhou"
 date: "2021/10/9"
 output: pdf_document
@@ -255,14 +255,20 @@ lines(x,fitted_60$fit_y[,min_lambda_60],col=2)
 
 
 ```{r}
+(MSE)
+(MSE_60)
 plot(x,y,xlab = "x",ylab = "y",main = "Fitted Spline (20 basis vs 60 basis)")
 
 lines(x,fitted_60$fit_y[,min_lambda_60],col=2)
 lines(x,fitted$fit_y[,min_lambda],col=3)
 ```
 
+Increasing the number of basis does not help to improve the result.
+
 
 # Question 2
+
+## (1)
 
 ```{r}
 k_list = c(3,6,9,12,15,18)
@@ -280,6 +286,8 @@ KNN = function(k,current_X, X){
   return(mean(y[index]))
 }
 ```
+
+## (2)
 
 ```{r}
 KNN_prediction = matrix(0,length(x),length(k_list))
@@ -307,29 +315,29 @@ for (i in 1:length(k_list)){
 par(mfrow=c(3,2))
 
 plot(x,y,main = "Knn with K = 3")
-points(x,KNN_prediction[,1],col = 2)
+lines(x,KNN_prediction[,1],col = 2)
 
 plot(x,y,main = "Knn with K = 7")
-points(x,KNN_prediction[,2],col = 2)
+lines(x,KNN_prediction[,2],col = 2)
 
 plot(x,y,main = "Knn with K = 11")
-points(x,KNN_prediction[,3],col = 2)
+lines(x,KNN_prediction[,3],col = 2)
 
 plot(x,y,main = "Knn with K = 15")
-points(x,KNN_prediction[,4],col = 2)
+lines(x,KNN_prediction[,4],col = 2)
 
 plot(x,y,main = "Knn with K = 19")
-points(x,KNN_prediction[,5],col = 2)
+lines(x,KNN_prediction[,5],col = 2)
 
 plot(x,y,main = "Knn with K = 23")
-points(x,KNN_prediction[,6],col = 2)
+lines(x,KNN_prediction[,6],col = 2)
 
 ```
 
 ```{r}
 rbind(k_list,KNN_MSE)
 ```
-
+When K = 7, we have the minimum MSE. Overall there is not a significant difference between using KNN and spline, but we can choose the different values of K to get slightly different results. Choosing an approximate K value could help us to get a better result. From the result we could say as the K value increases, the result is getting worse. However, the K value can not be too small since it will easily be affected by noisy data.
 
 ## (3)
 
@@ -353,9 +361,6 @@ accommodate_Kernels = function(x){
   }
   
     Gaussian = (2*pi)^(-1/2)*exp(-x^2/2)
-    
-    #return(list(Epanechnikov = Epanechnikov,Gaussian=Gaussian,Biweight = Biweight,
-                #Triweight= Triweight, Uniform= Uniform, Tricube = Tricube))
     
     return(c(Epanechnikov,Gaussian,Biweight,Triweight, Uniform, Tricube))
 }
@@ -408,35 +413,37 @@ Kernel_predict[1:10,]
 par(mfrow=c(3,2))
 
 plot(x,y,main = "Epanechnikov Kernel")
-points(x,Kernel_predict[,1],col = 2)
+lines(x,Kernel_predict[,1],col = 2)
 
 plot(x,y,main = "Gaussian Kernel")
-points(x,Kernel_predict[,2],col = 2)
+lines(x,Kernel_predict[,2],col = 2)
 
 plot(x,y,main = "Biweight Kernel")
-points(x,Kernel_predict[,3],col = 2)
+lines(x,Kernel_predict[,3],col = 2)
 
 plot(x,y,main = "Triweight Kernel")
-points(x,Kernel_predict[,4],col = 2)
+lines(x,Kernel_predict[,4],col = 2)
 
 plot(x,y,main = "Uniform Kernel")
-points(x,Kernel_predict[,5],col = 2)
+lines(x,Kernel_predict[,5],col = 2)
 
 plot(x,y,main = "Tricube Kernel")
-points(x,Kernel_predict[,6],col = 2)
+lines(x,Kernel_predict[,6],col = 2)
 ```
 
 
 ```{r}
 (Kernel_MSE = colSums((Kernel_predict - y)^2)/n)
 ```
-
+Triweight Kernel could provide the minimum MSE.
 
 # Question 3
 
 
-```{r}
+## (1)
 
+
+```{r}
 I = readPNG("CM.png")
 I = I[,,1] # only first channel
 I = t(apply(I, 2, rev))
@@ -444,6 +451,9 @@ par(mfrow = c(1,2))
 image(I,col = gray((0:255)/255))
 plot(density(I))
 ```
+
+## (2)
+
 ```{r}
 lappend <- function (lst, ...){
 lst <- c(lst, list(...))
@@ -454,120 +464,93 @@ lst <- c(lst, list(...))
 
 
 ```{r}
-mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6) {
+# The source code comes from MAST30027, edit by me
+EM_algo <- function(X, p, mu,sigma, epsilon=1e-6) {
   
-  w.curr = w.init
-  mu.curr = mu.init
-  sigma.curr = sigma.init
   
-  m_list = list(mu.curr)
-  c_list = list(sigma.curr)
+  
+  m_list = list(mu)
+  c_list = list(sigma)
   e_list = list(0)
     
-  log_liks = c(compute.log.lik(X, w.curr, mu.curr,sigma.curr)$ill)
-
-
+  
   criteria = 1
 
 
-  n.iter = 1
+  n = 1
   
   
   while((criteria > epsilon)){
-  #while( (n.iter <= max.iter)){
-   
 
     
-    n.iter = n.iter + 1
+    n = n + 1
 
-    EM.out = EM.iter(X, w.curr, mu.curr, sigma.curr)
-    
-    
+    result = EM_step(X, p, mu, sigma)
 
-    w.curr = EM.out$w.new
-    mu.curr = EM.out$mu.new
-    sigma.curr = EM.out$sigma.new
+    p = result$w.new
+    mu = result$mu.new
+    sigma = result$sigma.new
     
-    m_list = lappend(m_list,mu.curr)
-    c_list = lappend(c_list,sigma.curr)
-    
+    m_list = lappend(m_list,mu)
+    c_list = lappend(c_list,sigma)
     
 
     
-    
-    
-    e = sum(m_list[n.iter][[1]] - m_list[n.iter-1][[1]]) + 
-        sum(c_list[n.iter][[1]] - c_list[n.iter-1][[1]]) 
+    e = sum(m_list[n][[1]] - m_list[n-1][[1]]) + 
+        sum(c_list[n][[1]] - c_list[n-1][[1]]) 
     
     
     
     e_list = lappend(e_list,e)
     
-    criteria = abs(e - e_list[n.iter-1][[1]])
+    criteria = abs(e - e_list[n-1][[1]])
 
    
     
-    print(round(c(mu.curr,sigma.curr,w.curr),4))
+    print(round(c(mu,sigma,p),4))
     
   }
   
-  return(list(w.curr=w.curr, mu.curr=mu.curr, sigma.curr = sigma.curr))
+  return(list(mu=mu, sigma = sigma, p = p))
 }
 ```
 
 ```{r}
-EM.iter <- function(X, w.curr, mu.curr,sigma.curr) {
+EM_step <- function(X, p, mu,sigma) {
   
 
-  # E-step: compute E_{Z|X,\theta_0}[I(Z_i = k)]
+  # E-step:
   
-  # for each sample $X_i$, compute $P(X_i, Z_i=k)$ 
-  prob.x.z = compute.prob.x.z(X, w.curr, mu.curr,sigma.curr)$prob.x.z
+  prob.y_z = Prob.y_z(X, p, mu,sigma)
   
-  # compute P(Z_i=k | X_i)
-  P_ik = prob.x.z / rowSums(prob.x.z)
+  # compute posterior P(Z=k|y) 
+  posterior = prob.y_z / rowSums(prob.y_z)
   
   # M-step
-  w.new = colSums(P_ik)/sum(P_ik)  # sum(P_ik) is equivalent to sample size 
-  mu.new = colSums(P_ik*X)/colSums(P_ik)
+  w.new = colSums(posterior)/sum(posterior)  
   
-  sigma.new = update_sigma(P_ik,mu.new,X)
+  mu.new = colSums(posterior*X)/colSums(posterior)
+  
+  sigma.new = update_sigma(posterior,mu.new,X)
 
-  #return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.curr)
-  return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.new)
-         )
+
+  return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.new))
 }
 ```
 
 
 
 ```{r}
-# Compute observed log-likehoods
-compute.log.lik <- function(X, w.curr, mu.curr,sigma.curr) {
-  
-  # for each sample $X_i$, compute $P(X_i, Z_i=k)$
-  prob.x.z = compute.prob.x.z(X, w.curr, mu.curr,sigma.curr)$prob.x.z
-  
-  # incomplete log-likehoods
-  ill = sum(log(rowSums(prob.x.z)))
-  
-  
-  return(list(ill=ill))
-}
+# compute P(y, Z=k)
+Prob.y_z <- function(X, p, mu,sigma) {
 
-
-# for each sample $X_i$, compute $P(X_i, Z_i=k)$
-compute.prob.x.z <- function(X, w.curr, mu.curr,sigma.curr) {
-
-  
-  # for each sample $X_i$, compute $P(X_i, Z_i=k)$. Store these values in the columns of L:
-  L = matrix(NA, nrow=length(X), ncol= length(w.curr))
+  L = matrix(NA, nrow=length(X), ncol= length(p))
   for(k in seq_len(ncol(L))) {
-    #L[, k] = dnorm(X, mean=mu.curr[k], sd=0.1)*w.curr[k]
-    L[, k] = dnorm(X, mean=mu.curr[k], sd=sigma.curr[k])*w.curr[k]
+
+    L[, k] = dnorm(X, mean=mu[k], sd=sigma[k])*p[k]
   }
   
-  return(list(prob.x.z=L))
+  return(L)
 }
 ```
 
@@ -578,19 +561,22 @@ update_sigma = function(p,mu,X){
   
   mu_matrix = t(replicate(length(X),mu))
   X_matrix = replicate(length(mu),X)
-  
-  
   update_P = p * (X_matrix - mu_matrix)^2
   
-  return(sqrt(colSums(update_P)/colSums(p) ))
+  return(sqrt(colSums(update_P)/colSums(p)))
   
 }
 ```
 
 
+## (3)
 
 ```{r}
-EM <- mixture.EM(sort(c(I)), w.init=c(0.3,0.3, 0.4), mu.init=c(0, 0.5, 1),sigma.init=c(0.1, 0.1, 0.1), epsilon=1e-6)
+EM <- EM_algo(sort(c(I)), 
+              p=c(0.3,0.3, 0.4), 
+              mu=c(0, 0.5, 1),
+              sigma=c(0.1, 0.1, 0.1), 
+              epsilon=1e-6)
 ```
 
 
@@ -605,8 +591,8 @@ EM_result = c()
 for (i in sort(c(I))){
   
   EM_result = c( EM_result, 
-       dnorm(i,mean = EM$mu.curr[1],sd = EM$sigma.curr[1]) * EM$w.curr[1] +   dnorm(i,mean = EM$mu.curr[2],sd = EM$sigma.curr[2])* EM$w.curr[2] 
-  + dnorm(i,mean = EM$mu.curr[3],sd = EM$sigma.curr[3])*EM$w.curr[3])
+       dnorm(i,mean = EM$mu[1],sd = EM$sigma[1]) * EM$p[1] +   dnorm(i,mean = EM$mu[2],sd = EM$sigma[2])* EM$p[2] 
+  + dnorm(i,mean = EM$mu[3],sd = EM$sigma[3])*EM$p[3])
 }
 
 
@@ -621,44 +607,37 @@ legend(0,5.5,c("Density","EM"), lwd=c(2,2), col=c("black",2), y.intersp=1.5)
 
 ```
 
-```{r}
-EM_result_Image = c()
-
-for (i in c(I)){
-  
-  EM_result_Image = c( EM_result_Image, 
-       dnorm(i,mean = EM$mu.curr[1],sd = EM$sigma.curr[1]) * EM$w.curr[1] +   dnorm(i,mean = EM$mu.curr[2],sd = EM$sigma.curr[2])* EM$w.curr[2] 
-  + dnorm(i,mean = EM$mu.curr[3],sd = EM$sigma.curr[3])*EM$w.curr[3])
-}
-```
 
 ```{r}
-EM_Image = matrix(EM_result_Image,nrow = 398,ncol = 398)
-```
-
-```{r}
-z_predict = data.frame(compute.prob.x.z(c(I), EM$w.curr, EM$mu.curr,EM$sigma.curr))
-z_max = apply(z_predict,1,which.max)
-
-z_plot1 = z_max
-
-z_plot1[z_plot1 == 1] = 0
-z_plot1[z_plot1 == 2] = 8
-z_plot1[z_plot1 == 3] = 4
+z_predict = data.frame(Prob.y_z(c(I), EM$p, EM$mu,EM$sigma))
+image1 = apply(z_predict,1,which.max)
 
 
-```
+image1[image1 == 1] = 0
+image1[image1 == 2] = 8
+image1[image1 == 3] = 4
 
-```{r}
-image.plot(matrix(z_plot1,nrow = 398,ncol = 398))
+
 ```
 
 
 ```{r}
 posterior = z_predict / rowSums(z_predict)
-mu = t(replicate(length(c(I)),EM$mu.curr))
+mu = t(replicate(length(c(I)),EM$mu))
 
 image2 = rowSums(posterior * mu)
+```
+
+
+## (5)
+
+```{r}
+image.plot(matrix(image1,nrow = 398,ncol = 398))
+```
+
+
+```{r}
+
 
 image.plot(matrix(image2,nrow = 398,ncol = 398))
 
