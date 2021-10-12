@@ -16,6 +16,7 @@ library(splines)
 library(pracma)
 library(SpatialExtremes)
 library(MASS)
+library(Rfast)
 ```
 
 
@@ -315,7 +316,7 @@ points(x,KNN_prediction[,6],col = 2)
 ```{r}
 rbind(k_list,KNN_MSE)
 ```
-Overall there is not a significant difference between using KNN and spline, but we can choose different value of K to get slightly difference results.
+
 
 ## (3)
 
@@ -443,7 +444,7 @@ lst <- c(lst, list(...))
 
 
 ```{r}
-mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6, max.iter=100) {
+mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6) {
   
   w.curr = w.init
   mu.curr = mu.init
@@ -462,7 +463,7 @@ mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6, max.iter=100
   n.iter = 1
   
   
-  while((criteria > epsilon) & (n.iter <= max.iter)){
+  while((criteria > epsilon)){
   #while( (n.iter <= max.iter)){
    
 
@@ -504,11 +505,11 @@ mixture.EM <- function(X, w.init, mu.init,sigma.init, epsilon=1e-6, max.iter=100
 
     
     
-    print(round(c(mu.curr,w.curr,sigma.curr),4))
+    print(round(c(mu.curr,sigma.curr,w.curr),4))
     
   }
   
-  return(list(w.curr=w.curr, mu.curr=mu.curr, sigma.curr = sigma.curr,criteria=e_list))
+  return(list(w.curr=w.curr, mu.curr=mu.curr, sigma.curr = sigma.curr))
 }
 ```
 
@@ -528,7 +529,7 @@ EM.iter <- function(X, w.curr, mu.curr,sigma.curr) {
   w.new = colSums(P_ik)/sum(P_ik)  # sum(P_ik) is equivalent to sample size 
   mu.new = colSums(P_ik*X)/colSums(P_ik)
   
-  sigma.new = update_sigma(P_ik,mu.curr,X)
+  sigma.new = update_sigma(P_ik,mu.new,X)
 
   #return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.curr)
   return(list(w.new=w.new, mu.new=mu.new, sigma.new = sigma.new)
@@ -587,7 +588,7 @@ update_sigma = function(p,mu,X){
 
 
 ```{r}
-EM <- mixture.EM(c(I), w.init=c(0.3,0.3, 0.4), mu.init=c(0, 0.5, 1),sigma.init=c(0.1, 0.1, 0.1), epsilon=1e-6, max.iter=100)
+EM <- mixture.EM(sort(c(I)), w.init=c(0.3,0.3, 0.4), mu.init=c(0, 0.5, 1),sigma.init=c(0.1, 0.1, 0.1), epsilon=1e-6)
 ```
 
 
@@ -595,3 +596,65 @@ EM <- mixture.EM(c(I), w.init=c(0.3,0.3, 0.4), mu.init=c(0, 0.5, 1),sigma.init=c
 ```{r}
 EM
 ```
+## (4)
+```{r}
+EM_result = c()
+
+for (i in sort(c(I))){
+  
+  EM_result = c( EM_result, 
+       dnorm(i,mean = EM$mu.curr[1],sd = EM$sigma.curr[1]) * EM$w.curr[1] +   dnorm(i,mean = EM$mu.curr[2],sd = EM$sigma.curr[2])* EM$w.curr[2] 
+  + dnorm(i,mean = EM$mu.curr[3],sd = EM$sigma.curr[3])*EM$w.curr[3])
+}
+
+
+```
+
+
+```{r}
+
+plot(density(I), main = "Density function")
+lines(sort(c(I)),EM_result,lty = 1,col = 2)
+legend(0,5.5,c("Image Density","Estimated"), lwd=c(2,2), col=c("black",2), y.intersp=1.5)
+
+```
+```{r}
+EM_result_Image = c()
+
+for (i in c(I)){
+  
+  EM_result_Image = c( EM_result_Image, 
+       dnorm(i,mean = EM$mu.curr[1],sd = EM$sigma.curr[1]) * EM$w.curr[1] +   dnorm(i,mean = EM$mu.curr[2],sd = EM$sigma.curr[2])* EM$w.curr[2] 
+  + dnorm(i,mean = EM$mu.curr[3],sd = EM$sigma.curr[3])*EM$w.curr[3])
+}
+```
+
+```{r}
+EM_Image = matrix(EM_result_Image,nrow = 398,ncol = 398)
+```
+
+```{r}
+z_predict = data.frame(compute.prob.x.z(c(I), EM$w.curr, EM$mu.curr,EM$sigma.curr))
+z_max = apply(z_predict,1,which.max)
+
+z_max[z_max == 1] = 0
+z_max[z_max == 2] = 8
+z_max[z_max == 3] = 4
+
+#z_max_ = new[match(z_max,c(1,2,3))]
+
+```
+
+```{r}
+image.plot(matrix(z_max,nrow = 398,ncol = 398))
+```
+
+
+```{r}
+image.plot(matrix(z_predict,nrow = 398,ncol = 398))
+```
+
+```{r}
+rowMaxs(z_predict)
+```
+
